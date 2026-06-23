@@ -1,0 +1,121 @@
+# HarmonyOS 最佳实践 MCP 服务器
+
+把鸿蒙应用开发最佳实践资料(452 篇文档 + 186 个示例仓库)通过 MCP 暴露为检索工具,供 Claude Code / Cursor / Cline 等 MCP 客户端在开发时动态调用。
+
+**文档(9MB)随包发布,装包即用、零配置。** 代码(8GB)不随包,按需配置本地路径(见下)。
+
+## 提供的工具
+
+| 工具 | 作用 |
+|------|------|
+| `search_best_practices({query, limit?})` | 全文检索文档(中文友好),返回相关度排序的文档列表(含主题、是否有代码、代码仓库名) |
+| `get_doc({name})` | 读取指定文档(docId)的完整 Markdown 正文 |
+| `get_code_example({docName})` | 返回文档关联的参考代码:本地仓库绝对路径、远程 URL、入口 `.ets/.ts` 文件 |
+| `list_by_topic({topic?})` | 按大类浏览(稳定性/性能/媒体/功耗/一多…);省略参数返回所有大类及文档数 |
+
+## 安装(最终用户)
+
+无需 clone 本仓库。直接用 npx 或全局安装:
+
+```bash
+# 方式一:一次性运行(推荐)
+npx harmonyos-best-practices-mcp
+
+# 方式二:全局安装
+npm install -g harmonyos-best-practices-mcp
+```
+
+### 配置客户端
+
+**Claude Code**(`.mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "harmonyos-best-practices": {
+      "command": "npx",
+      "args": ["-y", "harmonyos-best-practices-mcp"]
+    }
+  }
+}
+```
+
+**Cursor / Cline / 其他 stdio 客户端**:同上,指向 `npx -y harmonyos-best-practices-mcp`。
+
+### (可选)启用本地代码读取
+
+默认 `get_code_example` 只返回 gitcode 远程 URL。若想直接读取真实 `.ets` 源码,获取代码并指向它:
+
+**方式 A:直接下载瘦身后的代码包(推荐,97MB)**
+
+从本项目 GitHub Release 下载 `harmonyos-best-practices-code.tar.gz`,解压得到 `best_practices_code/`。
+
+**方式 B:自行克隆并瘦身(原始 15GB → 505MB 解压)**
+
+```bash
+# 1. 克隆示例代码(约 15GB)
+git clone <各仓库> best_practices_code/
+
+# 2. 瘦身两刀(脚本随 npm 包附带,用 npx 拉取后通过包内路径运行)
+npx -y harmonyos-best-practices-mcp@latest node_modules/harmonyos-best-practices-mcp/scripts/trim-code.mjs best_practices_code/
+# 或先全局安装: npm i -g harmonyos-best-practices-mcp
+# 再跑: harmonyos-best-practices-mcp-trim-code best_practices_code/   (见下方 bin 说明)
+```
+
+> 瘦身脚本也提供为可执行 bin:`harmonyos-best-practices-mcp-trim-code` 与 `-trim-code-extra`,全局安装后可直接调用。
+
+> 注:`trim-code` 会删除 `.git` 历史,瘦身后无法 `git pull` 更新。建议先 `--dry-run` 预览。
+
+**方式 C:用完整代码(15GB,可编译)** —— 仅当你需要可编译工程时。
+
+Claude Code 配置加 env:
+
+```json
+{
+  "mcpServers": {
+    "harmonyos-best-practices": {
+      "command": "npx",
+      "args": ["-y", "harmonyos-best-practices-mcp"],
+      "env": { "BP_CODE_DIR": "/abs/path/to/best_practices_code" }
+    }
+  }
+}
+```
+
+### 环境变量
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `BP_DOCS_DIR` | 包内 `data/docs` | 文档目录(一般无需改) |
+| `BP_INDEX` | 包内 `data/index.md` | 索引文件(一般无需改) |
+| `BP_CODE_DIR` | 空 | 本地代码根目录;为空时 `get_code_example` 只给 URL |
+
+## 开发与发布(维护者)
+
+```bash
+cd harmonyos-best-practices-mcp
+npm install
+npm run build          # 编译 TS
+npm run prepack        # 拷贝文档到 data/ + 编译(发布前自动跑)
+npm run selfcheck      # 自检四个工具
+```
+
+发布到 npm:
+
+```bash
+npm login
+npm publish            # 自动触发 prepack 拷数据
+```
+
+包内含:`dist/` + `data/`(9MB 文档+索引) + `scripts/trim-code.mjs` + README。源码 `src/` 不随包。
+
+## 验证
+
+```bash
+npx @modelcontextprotocol/inspector node dist/index.js
+```
+
+## 配套 Skill
+
+`skills/harmonyos-best-practices/SKILL.md` 是薄 Skill,引导 AI"动手前先检索"。复制到 Claude Code 的 skills 目录即可启用。
+

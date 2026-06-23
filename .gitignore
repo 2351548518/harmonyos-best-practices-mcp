@@ -1,0 +1,29 @@
+# 依赖
+node_modules/
+**/node_modules/
+
+# 构建产物 / prepack 生成的包内副本(不进 git;发布时由 prepack 重新生成)
+harmonyos-best-practices-mcp/dist/
+harmonyos-best-practices-mcp/data/
+**/build/
+**/.cxx/
+**/oh_modules/
+
+# 数据源(不推 git;文档已随 npm 包,代码随 Release 附件)
+best_practices_docs/
+best_practices_code/
+# 注意: best_practices_docs_code_index.md 是数据源, 保留进 git(仅 9KB)
+# harmonyos-best-practices-mcp/data/index.md 是 prepack 生成的副本, 已被上面的 data/ 忽略
+
+# 发布产物(代码包 97MB 不进 git)
+release/*.tar.gz
+release/*.zip
+
+# 日志/临时
+*.log
+trim.log
+.claude/
+
+# 系统文件
+.DS_Store
+Thumbs.db
