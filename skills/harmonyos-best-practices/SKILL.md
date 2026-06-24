@@ -22,7 +22,7 @@ description: 在开发 HarmonyOS / OpenHarmony 应用(ArkTS、ArkUI、AVPlayer/A
 
 2. **读全文**:对最相关的 1–3 条命中,调用 `get_doc({name:"<docId>"})` 读取完整 Markdown 正文,理解官方推荐做法、正反例、关键 API。
 
-3. **读真实代码**:若命中标注 `✅有代码`,调用 `get_code_example({docName:"<docId>"})` 获取本地仓库绝对路径与入口 `.ets/.ts` 文件,然后用 Read 工具读这些文件,看官方示例到底怎么写。
+3. **读真实代码**:若命中标注 `✅有代码`,调用 `get_code_example({docName:"<docId>"})` 获取本地仓库绝对路径与入口 `.ets/.ts` 文件。返回里含**仓库 README 简介**和入口文件的**用途注释**——先看简介判断该仓库是否贴合需求,再用 Read 工具读入口文件,看官方示例到底怎么写。
 
 4. **遵循实践落地**:依据检索到的官方做法编写代码。优先复用示例中的结构、API 调用顺序与参数;不确定的接口以示例代码为准,而非凭记忆。
 

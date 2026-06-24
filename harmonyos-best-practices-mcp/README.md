@@ -1,6 +1,6 @@
 # HarmonyOS 最佳实践 MCP 服务器
 
-把鸿蒙应用开发最佳实践资料(452 篇文档 + 186 个示例仓库)通过 MCP 暴露为检索工具,供 Claude Code / Cursor / Cline 等 MCP 客户端在开发时动态调用。
+把鸿蒙应用开发最佳实践资料通过 MCP 暴露为检索工具,供 Claude Code / Cursor / Cline 等 MCP 客户端在开发时动态调用。
 
 **文档(9MB)随包发布,装包即用、零配置。** 代码(8GB)不随包,按需配置本地路径(见下)。
 
