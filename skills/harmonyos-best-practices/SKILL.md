@@ -1,6 +1,6 @@
 ---
 name: harmonyos-best-practices
-description: 在开发 HarmonyOS / OpenHarmony 应用(ArkTS、ArkUI、AVPlayer/AVRecorder、一多、服务卡片、并发、稳定性、性能、功耗等)时触发。动手写代码前,先经 MCP 工具检索官方最佳实践文档与配套参考代码,避免凭空编造鸿蒙 API。
+description: 查 HarmonyOS 场景化最佳实践与参考代码时触发(如 "长列表丢帧怎么优化""组件复用怎么写""冷启动时延优化""内存泄漏稳定性""音视频播放实践""一多适配实践")。对应 harmonyos-best-practices-mcp 的 search_best_practices / get_doc / get_code_example / list_by_topic 工具,检索 452 篇最佳实践文档 + 186 个示例代码仓库。注意:这是查"场景最佳实践 + 参考代码"(怎么做最好),若查 API 用法请用 harmonyos-guides,查接口定义用 harmonyos-api-references,查设计规范用 harmonyos-ui-design-guides。
 ---
 
 # 鸿蒙最佳实践 检索指引
@@ -15,6 +15,14 @@ description: 在开发 HarmonyOS / OpenHarmony 应用(ArkTS、ArkUI、AVPlayer/A
 - 一多(一次开发多端部署)、跨端迁移/分享/多端协同
 - 性能/功耗/稳定性优化(丢帧、内存泄漏、ASan、冷启动、主线程耗时)
 - 并发(TaskPool/Worker/Sendable)、网络、安全(隐私/数据安全/加解密)、NDK、卡片
+
+## 何时用本 Skill(而非 guides/api-references/ui-design-guides)
+
+- ✅ 用本实践:查**场景最佳实践 + 参考代码**——长列表/网格/瀑布流丢帧优化、组件复用、冷启动时延、内存泄漏/稳定性、功耗优化、音视频播放实践、一多适配实践等,带官方示例代码可参照。例:"长列表丢帧怎么优化""组件复用怎么写""冷启动慢"。
+- ❌ 用 guides:查 **API 怎么用**(代码层面调用、调用流程)。
+- ❌ 用 api-references:查**接口精确定义**(参数/枚举/错误码)。
+- ❌ 用 ui-design-guides:查**设计怎么做**(视觉/交互/控件设计规范)。
+- 配合:先本实践看场景怎么做最好 + 参考代码,再用 guides/api-references 查涉及 API 的精确用法,用 ui-design-guides 定 UI 设计规范。
 
 ## 检索流程
 
