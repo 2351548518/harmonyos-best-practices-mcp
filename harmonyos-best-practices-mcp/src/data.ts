@@ -13,12 +13,20 @@ export interface CodeRef {
 export interface DocMeta {
   docId: string;
   title: string;
-  topic: string;       // 大类
-  subtitle: string;    // 小标题
+  topic: string;       // 大类(路径首段)
+  subtitle: string;    // 小标题(路径首段之后的剩余,可多级)
+  path: string;        // 完整分类路径: "大类 / 小标题..."(用于 list_by_topic 多级下钻)
   codeRefs: CodeRef[];
   hasCode: boolean;    // any codeRef with status === "cloned"
   readmeDigest: string; // concatenated README intros of cloned repos (for search scoring)
   headings: string;    // all markdown heading texts joined (for search scoring)
+}
+
+const SEP = " / ";
+
+/** Build full category path from topic + subtitle. */
+function buildPath(topic: string, subtitle: string): string {
+  return subtitle ? `${topic}${SEP}${subtitle}` : topic;
 }
 
 export interface DataStore {
@@ -48,7 +56,12 @@ function defaultPaths() {
     // Code dir is NOT bundled (8GB). User points to their local clone via env.
     // Empty string means "no local code" -> get_code_example returns gitcode URLs only.
     codeDir: process.env.BP_CODE_DIR || "",
-    indexFile: process.env.BP_INDEX || path.join(dataDir, "index.md"),
+    // Code-repo index (docId -> repo mapping), machine-consumed. Renamed from
+    // index.md to code_list.md to disambiguate from the human-readable INDEX.md.
+    indexFile: process.env.BP_INDEX || path.join(dataDir, "code_list.md"),
+    // Crawler log (status \t docId \t "大类 / 小标题"), drives categorization.
+    // Lives at data/ root (sibling of code_list.md / INDEX.md), not under docs/.
+    logFile: process.env.BP_LOG || path.join(dataDir, "index_log.txt"),
   };
 }
 
@@ -98,6 +111,7 @@ function parseIndex(indexFile: string): Map<string, DocMeta> {
         title: h[2].trim(),
         topic: "",
         subtitle: "",
+        path: "",
         codeRefs: [],
         hasCode: false,
         readmeDigest: "",
@@ -137,9 +151,8 @@ function parseIndex(indexFile: string): Map<string, DocMeta> {
   return docs;
 }
 
-/** Parse _crawl_log.txt: status \t docId \t "大类 / 小标题" */
-function parseCrawlLog(docsDir: string, docs: Map<string, DocMeta>) {
-  const logFile = path.join(docsDir, "_crawl_log.txt");
+/** Parse index_log.txt: status \t docId \t "大类 / 小标题" */
+function parseCrawlLog(logFile: string, docs: Map<string, DocMeta>) {
   if (!fs.existsSync(logFile)) return;
   const text = fs.readFileSync(logFile, "utf8");
   for (const raw of text.split(/\r?\n/)) {
@@ -155,6 +168,7 @@ function parseCrawlLog(docsDir: string, docs: Map<string, DocMeta>) {
     if (meta) {
       meta.topic = topic;
       meta.subtitle = subtitle;
+      meta.path = buildPath(topic, subtitle);
     } else {
       // doc in log but not in index (e.g. 237 no-code docs) — create it.
       docs.set(docId, {
@@ -162,6 +176,7 @@ function parseCrawlLog(docsDir: string, docs: Map<string, DocMeta>) {
         title: subtitle || docId,
         topic,
         subtitle,
+        path: buildPath(topic, subtitle),
         codeRefs: [],
         hasCode: false,
         readmeDigest: "",
@@ -175,7 +190,7 @@ let _store: DataStore | null = null;
 
 export function getStore(): DataStore {
   if (_store) return _store;
-  const { docsDir, codeDir, indexFile } = defaultPaths();
+  const { docsDir, codeDir, indexFile, logFile } = defaultPaths();
   if (!fs.existsSync(indexFile)) {
     throw new Error(
       `索引文件不存在: ${indexFile}\n` +
@@ -183,12 +198,23 @@ export function getStore(): DataStore {
         `或通过环境变量 BP_INDEX / BP_DOCS_DIR 指向资料目录。`
     );
   }
+  if (!fs.existsSync(logFile)) {
+    throw new Error(
+      `分类日志不存在: ${logFile}\n` +
+        `该文件驱动文档分类,缺失会导致全部文档落入"未分类"。\n` +
+        `若从源码运行,请先执行 npm run prepack 拷贝数据到 data/;\n` +
+        `或通过环境变量 BP_LOG 指向 index_log.txt。`
+    );
+  }
   const docs = parseIndex(indexFile);
-  parseCrawlLog(docsDir, docs);
+  parseCrawlLog(logFile, docs);
 
   const topics = new Map<string, string[]>();
   for (const meta of docs.values()) {
-    if (!meta.topic) meta.topic = "未分类";
+    if (!meta.topic) {
+      meta.topic = "未分类";
+      if (!meta.path) meta.path = "未分类";
+    }
     const arr = topics.get(meta.topic) || [];
     arr.push(meta.docId);
     topics.set(meta.topic, arr);

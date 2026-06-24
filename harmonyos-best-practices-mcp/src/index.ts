@@ -17,6 +17,8 @@ const server = new McpServer({
   version: "0.1.0",
 });
 
+const SEP = " / ";
+
 /* ------------------------------------------------------------------ *
  * Tool 1: search_best_practices
  * ------------------------------------------------------------------ */
@@ -259,17 +261,25 @@ server.tool(
           `\n\n用 list_by_topic({topic:"<大类>"}) 查看该类下文档.`
       );
     }
-    const ids = store.topics.get(topic);
-    if (!ids || ids.length === 0) {
+    // Prefix match on full path: path === topic OR path startsWith "topic / ".
+    // Supports multi-level drill-down, e.g. "媒体" or "媒体 / Audio".
+    const prefix = topic.trim();
+    const matched: DocMeta[] = [];
+    for (const meta of store.docs.values()) {
+      if (meta.path === prefix || meta.path.startsWith(prefix + SEP)) {
+        matched.push(meta);
+      }
+    }
+    if (matched.length === 0) {
       return text(
-        `未找到大类 "${topic}"。可用大类: ${[...store.topics.keys()].sort().join("、")}`
+        `未找到路径 "${prefix}"。可用大类: ${[...store.topics.keys()].sort().join("、")}`
       );
     }
-    const rows = ids
-      .map((id) => store.docs.get(id))
-      .filter((m): m is DocMeta => !!m)
-      .map((m) => `- ${m.docId} — ${m.title}${m.hasCode ? " ✅有代码" : ""}`);
-    return text(`大类 "${topic}" (${ids.length} 篇):\n\n${rows.join("\n")}`);
+    matched.sort((a, b) => a.path.localeCompare(b.path) || a.docId.localeCompare(b.docId));
+    const rows = matched.map(
+      (m) => `- ${m.docId} — ${m.path}${m.hasCode ? " ✅有代码" : ""}`
+    );
+    return text(`路径 "${prefix}" 下 ${matched.length} 篇:\n\n${rows.join("\n")}`);
   }
 );
 

@@ -180,7 +180,7 @@ get_code_example("bpta-component-reuse")  ← 取本地仓库路径 + 入口 .et
 Best_Practices_MCP/
 ├── best_practices_docs/                 # 452 篇文档(数据源,非发布物)
 ├── best_practices_code/                 # 186 示例仓库(数据源;已瘦身)
-├── best_practices_docs_code_index.md    # 文档↔代码双向映射索引(数据源)
+├── code_index.md                        # 文档↔代码双向映射索引(数据源)
 │
 ├── harmonyos-best-practices-mcp/         # ① MCP 服务器(npm 包)
 │   ├── src/                             # TS 源码
