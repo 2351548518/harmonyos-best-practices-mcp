@@ -1,6 +1,6 @@
 # HarmonyOS 最佳实践 MCP 知识库
 
-把华为鸿蒙(HarmonyOS)应用开发最佳实践资料(452 篇官方文档 + 186 个示例仓库)封装成 MCP 检索服务,供 Claude Code / Cursor / Cline 等 AI 编程客户端在开发时调用——**动手写代码前先检索官方推荐做法与参考代码,避免凭空编造 ArkTS/ArkUI API**。
+把华为鸿蒙(HarmonyOS)应用开发最佳实践资料封装成 MCP 检索服务,供 Claude Code / Cursor / Cline 等 AI 编程客户端在开发时调用——**动手写代码前先检索官方推荐做法与参考代码,避免凭空编造 ArkTS/ArkUI API**。
 
 ## 这是什么
 
@@ -8,7 +8,7 @@
 |------|------|------|---------|
 | **① MCP 服务器** | 检索引擎,4 个工具:文档全文检索 / 读文档 / 取代码路径 / 按主题浏览 | 9MB 文档随包 | npm 包(`npx` 即用) |
 | **② 薄 Skill** | 引导 AI"动手前先检索"的流程说明 | 一篇 md | 复制到 skills 目录 |
-| **③ 参考代码包** | 186 个示例仓库源码,供 MCP 读取真实 `.ets` | 97MB 压缩包 | GitHub Release 附件 |
+| **③ 参考代码包** | 示例仓库源码,供 MCP 读取真实 `.ets` | 97MB 压缩包 | GitHub Release 附件 |
 
 三者关系:**MCP 是骨干,Skill 是触发器,代码包是可选增强**。只装 MCP+Skill 即可获得文档检索能力;加上代码包后,AI 能直接读取官方示例源码。
 
@@ -31,11 +31,11 @@
 
 > 包名以实际发布为准。Cursor / Cline / Continue 等任何支持 stdio 的 MCP 客户端同样配置。
 
-### 2. (可选)装 Skill
+### 2. 装 Skill
 
 将 `skills/harmonyos-best-practices/SKILL.md` 复制到 Claude Code 的 skills 目录(如 `~/.claude/skills/`)。这让 AI 在做鸿蒙开发时自动走"先检索后编码"的流程。
 
-### 3. (可选)下载代码包,启用本地代码读取
+### 3. 下载代码包,启用本地代码读取
 
 从 GitHub Release 下载 `harmonyos-best-practices-code.tar.gz`(97MB),解压后配置:
 
@@ -52,6 +52,28 @@
 ```
 
 配置后,`get_code_example` 会返回本地仓库路径与入口 `.ets` 文件,AI 可直接读取真实代码。
+
+## 更新
+
+文档和 MCP 服务器会持续更新。更新方式:
+
+**更新 MCP 服务器**(npm 包):
+
+```bash
+# npx 方式:加 -y 会自动拉最新版,无需手动操作
+# 若用全局安装,手动更新:
+npm update -g harmonyos-best-practices-mcp
+# 或指定版本:
+npm install -g harmonyos-best-practices-mcp@latest
+```
+
+更新后**重启 AI 客户端**(Claude Code / Cursor 等)让新进程加载新版 MCP。
+
+**更新文档/代码包**(随 npm 包发布,无需单独操作):
+- 文档随 MCP 包内置,更新包即更新文档。
+- 代码包(97MB)在 GitHub Release,有新版本时重新下载解压覆盖即可。
+
+**查看当前版本**:`npm view harmonyos-best-practices-mcp version`(最新发布版)或看客户端 MCP 面板里服务器的 version 字段。
 
 ## 四个 MCP 工具
 

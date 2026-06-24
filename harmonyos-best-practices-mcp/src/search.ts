@@ -67,6 +67,10 @@ export function search(store: DataStore, query: string, limit = 8): SearchHit[] 
     score += scoreAgainst(qTf, tokenize(meta.title), 5);
     score += scoreAgainst(qTf, tokenize(meta.subtitle), 3);
     score += scoreAgainst(qTf, tokenize(meta.topic), 2);
+    // All markdown headings — section-level signal, covers full doc (not just first 200 lines).
+    score += scoreAgainst(qTf, tokenize(meta.headings), 3);
+    // README intro of associated repos — rich signal (APIs used, what it does).
+    score += scoreAgainst(qTf, tokenize(meta.readmeDigest), 2);
 
     // Body scan (first ~200 lines) for recall. Lazy-read per candidate doc.
     const bodyScore = scanBody(store.docsDir, meta.docId, qTf, 200);

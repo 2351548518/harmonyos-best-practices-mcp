@@ -4,7 +4,10 @@ import * as path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { getStore, readDoc, resolveCodePath, type DocMeta, type CodeRef } from "./data.js";
+import {
+  getStore, readDoc, resolveCodePath, readRepoReadme, readReadmeIntro,
+  parseReadmeTree, type DocMeta, type CodeRef,
+} from "./data.js";
 import { search } from "./search.js";
 
 const store = getStore();
@@ -103,10 +106,19 @@ function formatCodeRef(ref: CodeRef): string {
   const exists = fs.existsSync(abs);
   lines.push(`  本地: ${abs}${exists ? "" : "  ⚠️ 路径在磁盘上不存在(检查 BP_CODE_DIR 或自行克隆该仓库)"}`);
   if (exists) {
+    // README 简介 + 工程目录树(若有),帮助快速理解仓库用途与文件分工.
+    const intro = readReadmeIntro(abs);
+    if (intro) lines.push(`  简介: ${intro}`);
+    const readme = readRepoReadme(abs);
+    const tree = readme ? parseReadmeTree(readme) : new Map<string, string>();
     const entries = listEntryFiles(abs);
     if (entries.length) {
       lines.push(`  入口文件:`);
-      for (const e of entries) lines.push(`    - ${e}`);
+      for (const e of entries) {
+        const base = path.basename(e);
+        const purpose = tree.get(base);
+        lines.push(purpose ? `    - ${e}  // ${purpose}` : `    - ${e}`);
+      }
     }
   }
   return lines.join("\n");
@@ -116,49 +128,62 @@ function statusText(s: CodeRef["status"]): string {
   return s === "cloned" ? "✅ 已克隆" : s === "skipped" ? "⏭️ 核心仓跳过" : "❌ 缺失";
 }
 
-/** Find up to 8 entry source files (.ets/.ts) in a repo, preferring pages/. */
+/**
+ * Find up to 8 entry source files (.ets/.ts) in a repo.
+ * Strategy: try a list of well-known source dirs (pages > view/components > ets),
+ * each scanned recursively; if none yield files, walk the whole repo (skipping
+ * noise dirs) so unusual module layouts (library/, features/, products/) still work.
+ */
 function listEntryFiles(repoAbs: string): string[] {
+  const LIMIT = 8;
+  // Ordered: prefer pages/, then view/components, then the ets root of each module.
+  // Covers entry/, library/, features/<x>/, products/<phone>/ style layouts.
   const candidates = [
     "entry/src/main/ets/pages",
+    "entry/src/main/ets/view",
+    "entry/src/main/ets/views",
+    "entry/src/main/ets/components",
     "entry/src/main/ets",
+    "library/src/main/ets/pages",
+    "library/src/main/ets",
   ];
   for (const c of candidates) {
-    const dir = path.join(repoAbs, c.replace(/\//g, path.sep));
-    if (fs.existsSync(dir)) {
-      const files = listDirFiles(dir, [".ets", ".ts"], 8);
+    const dir = path.join(repoAbs, c);
+    if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+      const files = listDirFiles(dir, [".ets", ".ts"], LIMIT);
       if (files.length) return files;
     }
   }
-  // fallback: shallow walk under entry/src (skip resources/build/oh_modules)
-  const entrySrc = path.join(repoAbs, "entry", "src");
-  if (fs.existsSync(entrySrc)) {
-    return walkSources(entrySrc, 8, 3);
-  }
-  return [];
+  // Fallback: walk the whole repo, skipping noise. Deep enough for multi-module layouts.
+  return walkSources(repoAbs, LIMIT, 8);
 }
 
+/** True for config/test/build noise files we don't want as "entry" examples. */
+function isNoiseFile(name: string): boolean {
+  const lower = name.toLowerCase();
+  if (lower.startsWith("hvigorfile")) return true;
+  if (lower.endsWith(".test.ts") || lower.endsWith(".test.ets")) return true;
+  if (lower === "build-profile.ts") return true;
+  if (lower === "oh-package.json5.ts") return true;
+  return false;
+}
+
+/** Rank: pages/ > view/components > Index.ets > other .ets > .ts. Lower = better. */
+function fileRank(fullPath: string): number {
+  const norm = fullPath.replace(/\\/g, "/").toLowerCase();
+  if (norm.includes("/pages/")) return 0;
+  if (norm.includes("/view/") || norm.includes("/views/")) return 1;
+  if (norm.includes("/components/")) return 2;
+  if (norm.endsWith("/index.ets")) return 3;
+  if (norm.endsWith(".ets")) return 4;
+  return 5; // .ts
+}
+
+/** Recursively collect .ets/.ts source files under dir, skipping noise dirs/files. */
 function listDirFiles(dir: string, exts: string[], limit: number): string[] {
-  let ents: string[];
-  try {
-    ents = fs.readdirSync(dir);
-  } catch {
-    return [];
-  }
   const out: string[] = [];
-  for (const name of ents.sort()) {
-    if (exts.some((e) => name.endsWith(e))) {
-      out.push(path.join(dir, name));
-      if (out.length >= limit) break;
-    }
-  }
-  return out;
-}
-
-const SKIP_DIRS = new Set(["resources", "build", "oh_modules", "node_modules", ".git", ".cxx", "cpp", "libs"]);
-function walkSources(dir: string, limit: number, maxDepth: number): string[] {
-  const out: string[] = [];
-  const visit = (d: string, depth: number) => {
-    if (out.length >= limit || depth > maxDepth) return;
+  const visit = (d: string) => {
+    if (out.length >= 64) return; // collect a pool then rank+trim
     let ents: fs.Dirent[];
     try {
       ents = fs.readdirSync(d, { withFileTypes: true });
@@ -166,17 +191,47 @@ function walkSources(dir: string, limit: number, maxDepth: number): string[] {
       return;
     }
     for (const e of ents) {
-      if (out.length >= limit) return;
+      if (e.isDirectory()) {
+        if (SKIP_DIRS.has(e.name)) continue;
+        visit(path.join(d, e.name));
+      } else if (e.isFile() && exts.some((x) => e.name.endsWith(x)) && !isNoiseFile(e.name)) {
+        out.push(path.join(d, e.name));
+      }
+    }
+  };
+  visit(dir);
+  out.sort((a, b) => fileRank(a) - fileRank(b) || a.localeCompare(b));
+  return out.slice(0, limit);
+}
+
+const SKIP_DIRS = new Set([
+  "resources", "build", "oh_modules", "node_modules", ".git", ".cxx",
+  "cpp", "libs", "rawfile", "media", "drawable", "element",
+  "test", "ohosTest", "testrunner", ".test", ".hvigor", ".idea",
+  "commons", "hvigor", "scripts",
+]);
+function walkSources(dir: string, limit: number, maxDepth: number): string[] {
+  const out: string[] = [];
+  const visit = (d: string, depth: number) => {
+    if (out.length >= 64 || depth > maxDepth) return;
+    let ents: fs.Dirent[];
+    try {
+      ents = fs.readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of ents) {
       if (e.isDirectory()) {
         if (SKIP_DIRS.has(e.name)) continue;
         visit(path.join(d, e.name), depth + 1);
-      } else if (e.isFile() && (e.name.endsWith(".ets") || e.name.endsWith(".ts"))) {
+      } else if (e.isFile() && (e.name.endsWith(".ets") || e.name.endsWith(".ts")) && !isNoiseFile(e.name)) {
         out.push(path.join(d, e.name));
       }
     }
   };
   visit(dir, 0);
-  return out;
+  out.sort((a, b) => fileRank(a) - fileRank(b) || a.localeCompare(b));
+  return out.slice(0, limit);
 }
 
 /* ------------------------------------------------------------------ *

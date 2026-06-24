@@ -10,7 +10,7 @@
 |------|------|
 | `search_best_practices({query, limit?})` | 全文检索文档(中文友好),返回相关度排序的文档列表(含主题、是否有代码、代码仓库名) |
 | `get_doc({name})` | 读取指定文档(docId)的完整 Markdown 正文 |
-| `get_code_example({docName})` | 返回文档关联的参考代码:本地仓库绝对路径、远程 URL、入口 `.ets/.ts` 文件 |
+| `get_code_example({docName})` | 返回文档关联的参考代码:本地仓库绝对路径、远程 URL、README 简介、入口 `.ets/.ts` 文件(带用途注释) |
 | `list_by_topic({topic?})` | 按大类浏览(稳定性/性能/媒体/功耗/一多…);省略参数返回所有大类及文档数 |
 
 ## 安装(最终用户)
@@ -18,10 +18,10 @@
 无需 clone 本仓库。直接用 npx 或全局安装:
 
 ```bash
-# 方式一:一次性运行(推荐)
-npx harmonyos-best-practices-mcp
+# 方式一:一次性运行(推荐,每次自动拉最新版)
+npx -y harmonyos-best-practices-mcp
 
-# 方式二:全局安装
+# 方式二:全局安装(需手动更新)
 npm install -g harmonyos-best-practices-mcp
 ```
 
@@ -89,6 +89,33 @@ Claude Code 配置加 env:
 | `BP_DOCS_DIR` | 包内 `data/docs` | 文档目录(一般无需改) |
 | `BP_INDEX` | 包内 `data/index.md` | 索引文件(一般无需改) |
 | `BP_CODE_DIR` | 空 | 本地代码根目录;为空时 `get_code_example` 只给 URL |
+
+## 更新
+
+文档和服务器会持续更新(版本号见 `package.json`)。
+
+**更新服务器**:
+
+```bash
+# npx -y 方式:无需手动操作,每次启动自动拉最新版
+# 全局安装方式:手动更新
+npm update -g harmonyos-best-practices-mcp
+# 或锁定最新版
+npm install -g harmonyos-best-practices-mcp@latest
+```
+
+更新后**重启 AI 客户端**(Claude Code / Cursor / Cline 等),让新进程加载新版 MCP。
+
+**更新文档**:文档随包内置(`data/docs/`),更新 npm 包即同步更新 452 篇文档,无需单独操作。
+
+**更新代码包**(仅当启用了本地代码读取):GitHub Release 有新版 `harmonyos-best-practices-code.tar.gz` 时,重新下载解压覆盖 `BP_CODE_DIR` 指向的目录即可。
+
+**查看版本**:
+```bash
+npm view harmonyos-best-practices-mcp version   # 最新发布版
+npm ls -g harmonyos-best-practices-mcp          # 本地已装版本
+```
+或看客户端 MCP 面板里服务器的 `version` 字段。
 
 ## 开发与发布(维护者)
 

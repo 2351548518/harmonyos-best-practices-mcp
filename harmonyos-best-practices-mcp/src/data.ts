@@ -17,6 +17,8 @@ export interface DocMeta {
   subtitle: string;    // 小标题
   codeRefs: CodeRef[];
   hasCode: boolean;    // any codeRef with status === "cloned"
+  readmeDigest: string; // concatenated README intros of cloned repos (for search scoring)
+  headings: string;    // all markdown heading texts joined (for search scoring)
 }
 
 export interface DataStore {
@@ -98,6 +100,8 @@ function parseIndex(indexFile: string): Map<string, DocMeta> {
         subtitle: "",
         codeRefs: [],
         hasCode: false,
+        readmeDigest: "",
+        headings: "",
       };
       continue;
     }
@@ -160,6 +164,8 @@ function parseCrawlLog(docsDir: string, docs: Map<string, DocMeta>) {
         subtitle,
         codeRefs: [],
         hasCode: false,
+        readmeDigest: "",
+        headings: "",
       });
     }
   }
@@ -188,8 +194,134 @@ export function getStore(): DataStore {
     topics.set(meta.topic, arr);
   }
 
+  // Preload a short README digest for each cloned repo, used for search scoring.
+  // Only read when codeDir is configured; otherwise leave empty (search still works on doc text).
+  if (codeDir) {
+    for (const meta of docs.values()) {
+      if (!meta.hasCode) continue;
+      const digests: string[] = [];
+      for (const ref of meta.codeRefs) {
+        if (ref.status !== "cloned" || !ref.localPath) continue;
+        const repoAbs = resolveCodePath(codeDir, ref.localPath);
+        const intro = readReadmeIntro(repoAbs);
+        if (intro) digests.push(intro);
+      }
+      meta.readmeDigest = digests.join(" \n ");
+    }
+  }
+
+  // Preload all markdown headings for each doc — rich section-level signal for search.
+  for (const meta of docs.values()) {
+    meta.headings = extractHeadings(docsDir, meta.docId);
+  }
+
   _store = { docs, topics, docsDir, codeDir };
   return _store;
+}
+
+/** Extract all markdown heading texts from a doc, joined by space. Light & full-text. */
+export function extractHeadings(docsDir: string, docId: string): string {
+  const file = path.join(docsDir, `${docId}.md`);
+  let text: string;
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch {
+    return "";
+  }
+  const heads: string[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/^#{1,6}\s+(.+?)\s*#*\s*$/);
+    if (m) {
+      // strip inline markdown noise (**bold**, `code`, links)
+      const clean = m[1]
+        .replace(/\*\*/g, "")
+        .replace(/`([^`]+)`/g, "$1")
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+        .trim();
+      if (clean) heads.push(clean);
+    }
+  }
+  return heads.join("  ");
+}
+
+/** Read the intro section (project overview) of a repo's README.md, ~300 chars. */
+export function readReadmeIntro(repoAbs: string): string {
+  const file = path.join(repoAbs, "README.md");
+  let text: string;
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch {
+    return "";
+  }
+  // Try to isolate the "项目简介/Overview/简介" section: from that heading up to the
+  // next section (效果预览/使用说明/How to Use/Effect/工程目录...).
+  const startMatch = text.match(/(?:^|\n)#+\s*(项目简介|简介|Overview|Project Overview|介绍)\s*\n/i);
+  let body: string;
+  if (startMatch) {
+    const after = text.slice((startMatch.index ?? 0) + startMatch[0].length);
+    const endMatch = after.match(/\n#+\s*(效果预览|使用说明|工程目录|Project Directory|How to Use|Effect|具体实现|相关概念|目录结构)/i);
+    body = endMatch ? after.slice(0, endMatch.index) : after;
+  } else {
+    // No intro heading: take everything before the first ## section after the title.
+    const lines = text.split(/\r?\n/);
+    body = lines.slice(1, 40).join("\n");
+  }
+  const cleaned = body
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/^#+\s*/gm, "")
+    .replace(/[*_`>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned.slice(0, 300);
+}
+
+/** Read a repo's README.md full text (for get_code_example). Null if missing. */
+export function readRepoReadme(repoAbs: string): string | null {
+  const file = path.join(repoAbs, "README.md");
+  if (!fs.existsSync(file)) return null;
+  try {
+    return fs.readFileSync(file, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse the "工程目录 / Project Directory" tree from a README, returning a map of
+ * basename -> purpose comment (e.g. "VideoList.ets" -> "视频列表组件").
+ * Returns empty map if no tree found.
+ */
+export function parseReadmeTree(readme: string): Map<string, string> {
+  const out = new Map<string, string>();
+  if (!readme) return out;
+  // Find the directory-tree code block: usually after "工程目录"/"Project Directory"/"目录结构".
+  const marker = readme.match(/(工程目录|Project Directory|目录结构|目录说明)[^\n]*\n/i);
+  let start = marker ? marker.index! + marker[0].length : -1;
+  let block = "";
+  if (start >= 0) {
+    // Take the fenced ``` ... ``` block that follows, or indented tree lines.
+    const after = readme.slice(start);
+    const fence = after.match(/```[\s\S]*?```/);
+    if (fence) {
+      block = fence[0].replace(/```/g, "");
+    } else {
+      // fallback: lines that look like tree (contain ├── or │ or //)
+      const lines = after.split(/\r?\n/).filter((l) => /^[│├└\s]*[─-]/.test(l) || l.includes("//"));
+      block = lines.join("\n");
+    }
+  }
+  if (!block) return out;
+  // Each tree line: optional tree chars, a path/file, optional "// purpose"
+  for (const line of block.split(/\r?\n/)) {
+    const m = line.match(/([A-Za-z0-9_\-./]+\.(?:ets|ts))\s*\/\/\s*(.+?)\s*$/);
+    if (m) {
+      const base = m[1].split("/").pop()!.trim();
+      out.set(base, m[2].trim());
+    }
+  }
+  return out;
 }
 
 /** Read a doc's full markdown body. Returns null if missing. */
