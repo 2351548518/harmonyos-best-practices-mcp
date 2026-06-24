@@ -4,6 +4,16 @@
 
 **文档(9MB)随包发布,装包即用、零配置。** 代码(8GB)不随包,按需配置本地路径(见下)。
 
+与姊妹项目分工互补:
+
+| | 本项目(best-practices) | guides | api-references | ui-design-guides |
+|---|---|---|---|---|
+| 查什么 | **场景最佳实践 + 参考代码** | **API 用法、调用流程** | **接口精确定义**(参数/枚举) | **设计怎么做**(视觉/交互/控件设计规范) |
+| 数据 | 452 篇 + 186 代码仓库 | 5489 篇指南 | 4495 篇 API 参考 | 166 篇设计指南 |
+| 适用 | "长列表丢帧优化""组件复用范例" | "AVPlayer 怎么初始化" | "AudioCapturer 方法签名" | "底部页签设计规范" |
+
+四者并列:best-practices 给场景实践与参考代码、guides 讲 API 用法、api-references 查精确签名、ui-design-guides 定设计规范。
+
 ## 提供的工具
 
 | 工具 | 作用 |
@@ -13,7 +23,34 @@
 | `get_code_example({docName})` | 返回文档关联的参考代码:本地仓库绝对路径、远程 URL、README 简介、入口 `.ets/.ts` 文件(带用途注释) |
 | `list_by_topic({topic?})` | 按大类浏览(稳定性/性能/媒体/功耗/一多…);省略参数返回所有大类及文档数 |
 
-## 安装(最终用户)
+## 四者并列使用(opencode 示例)
+
+```json
+{
+  "mcp": {
+    "harmonyos-best-practices": {
+      "type": "local",
+      "command": ["npx", "-y", "harmonyos-best-practices-mcp"]
+    },
+    "harmonyos-guides": {
+      "type": "local",
+      "command": ["npx", "-y", "harmonyos-guides-mcp"]
+    },
+    "harmonyos-api-references": {
+      "type": "local",
+      "command": ["npx", "-y", "harmonyos-api-references-mcp"]
+    },
+    "harmonyos-ui-design-guides": {
+      "type": "local",
+      "command": ["npx", "-y", "harmonyos-ui-design-guides-mcp"]
+    }
+  }
+}
+```
+
+搭配各自的 Skill(`harmonyos-best-practices` / `harmonyos-guides` / `harmonyos-api-references` / `harmonyos-ui-design-guides`),AI 可据需求选用:guides 查 API 用法、best-practices 查场景实践与参考代码、api-references 查精确签名、ui-design-guides 查设计规范。
+
+## 安装
 
 无需 clone 本仓库。直接用 npx 或全局安装:
 
