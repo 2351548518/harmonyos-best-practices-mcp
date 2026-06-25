@@ -112,7 +112,7 @@ npm install -g harmonyos-best-practices-mcp
 }
 ```
 
-> `@latest` 每次启动联网拉最新版(图省事);也可固定版本如 `@0.2.1` 避免版本漂移与启动联网。
+> `@latest` 每次启动联网拉最新版;也可固定版本如 `@0.2.1` 避免版本漂移与启动联网。
 
 **Cursor / Cline / 其他 stdio 客户端**:同上,指向 `npx -y harmonyos-best-practices-mcp@latest`。
 
