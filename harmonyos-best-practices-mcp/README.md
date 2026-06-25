@@ -18,10 +18,12 @@
 
 | 工具 | 作用 |
 |------|------|
-| `search_best_practices({query, limit?})` | 全文检索文档(中文友好),返回相关度排序的文档列表(含主题、是否有代码、代码仓库名) |
+| `search_best_practices({query, limit?})` | 全文检索文档(BM25 + CJK 权重 + 同义词扩展,中文友好),返回相关度排序的文档列表(含主题、是否有代码、代码仓库名) |
 | `get_doc({name})` | 读取指定文档(docId)的完整 Markdown 正文 |
 | `get_code_example({docName})` | 返回文档关联的参考代码:本地仓库绝对路径、远程 URL、README 简介、入口 `.ets/.ts` 文件(带用途注释) |
-| `list_by_topic({topic?})` | 按大类浏览(稳定性/性能/媒体/功耗/一多…);省略参数返回所有大类及文档数 |
+| `list_by_topic({topic?})` | 按分类路径浏览(稳定性/性能/媒体/功耗/一多…),支持多级下钻(如 `媒体 / 音频和视频`);省略参数返回所有大类及文档数 |
+
+**检索算法**:BM25 排序(TF 饱和 + 文档长度归一化 + IDF)→ CJK 单字×0.3 / 双字 bigram×0.5 降权(抑制跨词边界噪声)→ 域内同义词软 OR 扩展(`data/synonyms.json` 驱动)。同义词词典数据驱动,编辑 JSON 即可扩展,无需改代码。
 
 ## 四者并列使用
 
@@ -32,20 +34,20 @@
   "mcp": {
     "harmonyos-best-practices": {
       "type": "local",
-      "command": ["npx", "-y", "harmonyos-best-practices-mcp"],
+      "command": ["npx", "-y", "harmonyos-best-practices-mcp@latest"],
       "environment": { "BP_CODE_DIR": "/abs/path/to/best_practices_code" }
     },
     "harmonyos-guides": {
       "type": "local",
-      "command": ["npx", "-y", "harmonyos-guides-mcp"]
+      "command": ["npx", "-y", "harmonyos-guides-mcp@latest"]
     },
     "harmonyos-api-references": {
       "type": "local",
-      "command": ["npx", "-y", "harmonyos-api-references-mcp"]
+      "command": ["npx", "-y", "harmonyos-api-references-mcp@latest"]
     },
     "harmonyos-ui-design-guides": {
       "type": "local",
-      "command": ["npx", "-y", "harmonyos-ui-design-guides-mcp"]
+      "command": ["npx", "-y", "harmonyos-ui-design-guides-mcp@latest"]
     }
   }
 }
@@ -58,20 +60,20 @@
   "mcpServers": {
     "harmonyos-best-practices": {
       "command": "npx",
-      "args": ["-y", "harmonyos-best-practices-mcp"],
+      "args": ["-y", "harmonyos-best-practices-mcp@latest"],
       "env": { "BP_CODE_DIR": "/abs/path/to/best_practices_code" }
     },
     "harmonyos-guides": {
       "command": "npx",
-      "args": ["-y", "harmonyos-guides-mcp"]
+      "args": ["-y", "harmonyos-guides-mcp@latest"]
     },
     "harmonyos-api-references": {
       "command": "npx",
-      "args": ["-y", "harmonyos-api-references-mcp"]
+      "args": ["-y", "harmonyos-api-references-mcp@latest"]
     },
     "harmonyos-ui-design-guides": {
       "command": "npx",
-      "args": ["-y", "harmonyos-ui-design-guides-mcp"]
+      "args": ["-y", "harmonyos-ui-design-guides-mcp@latest"]
     }
   }
 }
@@ -89,7 +91,7 @@
 
 ```bash
 # 方式一:一次性运行(推荐,每次自动拉最新版)
-npx -y harmonyos-best-practices-mcp
+npx -y harmonyos-best-practices-mcp@latest
 
 # 方式二:全局安装(需手动更新)
 npm install -g harmonyos-best-practices-mcp
@@ -104,13 +106,15 @@ npm install -g harmonyos-best-practices-mcp
   "mcpServers": {
     "harmonyos-best-practices": {
       "command": "npx",
-      "args": ["-y", "harmonyos-best-practices-mcp"]
+      "args": ["-y", "harmonyos-best-practices-mcp@latest"]
     }
   }
 }
 ```
 
-**Cursor / Cline / 其他 stdio 客户端**:同上,指向 `npx -y harmonyos-best-practices-mcp`。
+> `@latest` 每次启动联网拉最新版(图省事);也可固定版本如 `@0.2.1` 避免版本漂移与启动联网。
+
+**Cursor / Cline / 其他 stdio 客户端**:同上,指向 `npx -y harmonyos-best-practices-mcp@latest`。
 
 ### (可选)启用本地代码读取
 
@@ -145,7 +149,7 @@ Claude Code 配置加 env:
   "mcpServers": {
     "harmonyos-best-practices": {
       "command": "npx",
-      "args": ["-y", "harmonyos-best-practices-mcp"],
+      "args": ["-y", "harmonyos-best-practices-mcp@latest"],
       "env": { "BP_CODE_DIR": "/abs/path/to/best_practices_code" }
     }
   }
@@ -157,8 +161,22 @@ Claude Code 配置加 env:
 | 变量 | 默认 | 说明 |
 |------|------|------|
 | `BP_DOCS_DIR` | 包内 `data/docs` | 文档目录(一般无需改) |
-| `BP_INDEX` | 包内 `data/index.md` | 索引文件(一般无需改) |
+| `BP_INDEX` | 包内 `data/code_list.md` | 文档↔代码仓库映射索引(机器读,一般无需改) |
+| `BP_LOG` | 包内 `data/index_log.txt` | 分类日志(驱动文档分类,缺失会报错;一般无需改) |
 | `BP_CODE_DIR` | 空 | 本地代码根目录;为空时 `get_code_example` 只给 URL |
+
+> `data/synonyms.json` 为同义词词典(随包),缺失时检索退化为无同义词扩展,不影响正常使用。`data/INDEX.md` 是人读文档索引(代码不读)。
+
+### 数据布局(包内 `data/`)
+
+```
+data/
+├── docs/           # 纯 .md 文档(452 篇)
+├── index_log.txt   # 分类日志(机器读,驱动分类)
+├── code_list.md    # 文档↔代码仓库映射(机器读)
+├── synonyms.json   # 同义词词典(检索用,可编辑扩展)
+└── INDEX.md        # 人读文档索引(按 29 大类分组,代码不读)
+```
 
 ## 更新
 

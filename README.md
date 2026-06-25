@@ -31,20 +31,20 @@
   "mcp": {
     "harmonyos-best-practices": {
       "type": "local",
-      "command": ["npx", "-y", "harmonyos-best-practices-mcp"],
+      "command": ["npx", "-y", "harmonyos-best-practices-mcp@latest"],
       "environment": { "BP_CODE_DIR": "/abs/path/to/best_practices_code" }
     },
     "harmonyos-guides": {
       "type": "local",
-      "command": ["npx", "-y", "harmonyos-guides-mcp"]
+      "command": ["npx", "-y", "harmonyos-guides-mcp@latest"]
     },
     "harmonyos-api-references": {
       "type": "local",
-      "command": ["npx", "-y", "harmonyos-api-references-mcp"]
+      "command": ["npx", "-y", "harmonyos-api-references-mcp@latest"]
     },
     "harmonyos-ui-design-guides": {
       "type": "local",
-      "command": ["npx", "-y", "harmonyos-ui-design-guides-mcp"]
+      "command": ["npx", "-y", "harmonyos-ui-design-guides-mcp@latest"]
     }
   }
 }
@@ -57,20 +57,20 @@
   "mcpServers": {
     "harmonyos-best-practices": {
       "command": "npx",
-      "args": ["-y", "harmonyos-best-practices-mcp"],
+      "args": ["-y", "harmonyos-best-practices-mcp@latest"],
       "env": { "BP_CODE_DIR": "/abs/path/to/best_practices_code" }
     },
     "harmonyos-guides": {
       "command": "npx",
-      "args": ["-y", "harmonyos-guides-mcp"]
+      "args": ["-y", "harmonyos-guides-mcp@latest"]
     },
     "harmonyos-api-references": {
       "command": "npx",
-      "args": ["-y", "harmonyos-api-references-mcp"]
+      "args": ["-y", "harmonyos-api-references-mcp@latest"]
     },
     "harmonyos-ui-design-guides": {
       "command": "npx",
-      "args": ["-y", "harmonyos-ui-design-guides-mcp"]
+      "args": ["-y", "harmonyos-ui-design-guides-mcp@latest"]
     }
   }
 }
@@ -93,13 +93,13 @@
   "mcpServers": {
     "harmonyos-best-practices": {
       "command": "npx",
-      "args": ["-y", "harmonyos-best-practices-mcp"]
+      "args": ["-y", "harmonyos-best-practices-mcp@latest"]
     }
   }
 }
 ```
 
-> 包名以实际发布为准。Cursor / Cline / Continue 等任何支持 stdio 的 MCP 客户端同样配置。
+> 包名以实际发布为准。`@latest` 让每次启动拉最新版(图省事);也可固定版本如 `@0.2.1` 避免版本漂移。Cursor / Cline / Continue 等任何支持 stdio 的 MCP 客户端同样配置。
 
 ### 2. 装 Skill
 
@@ -114,7 +114,7 @@
   "mcpServers": {
     "harmonyos-best-practices": {
       "command": "npx",
-      "args": ["-y", "harmonyos-best-practices-mcp"],
+      "args": ["-y", "harmonyos-best-practices-mcp@latest"],
       "env": { "BP_CODE_DIR": "/abs/path/to/best_practices_code" }
     }
   }
@@ -149,10 +149,12 @@ npm install -g harmonyos-best-practices-mcp@latest
 
 | 工具 | 作用 |
 |------|------|
-| `search_best_practices({query, limit?})` | 全文检索文档(中文友好),返回相关度排序的文档列表(含主题、是否有代码、代码仓库名) |
+| `search_best_practices({query, limit?})` | 全文检索文档(BM25 + CJK 权重 + 同义词扩展,中文友好),返回相关度排序的文档列表(含主题、是否有代码、代码仓库名) |
 | `get_doc({name})` | 读取指定文档(docId)的完整 Markdown 正文 |
 | `get_code_example({docName})` | 返回文档关联的参考代码:本地仓库路径、远程 URL、入口 `.ets/.ts` 文件 |
-| `list_by_topic({topic?})` | 按大类浏览(稳定性/性能/媒体/功耗/一多…);省略参数返回所有大类及文档数 |
+| `list_by_topic({topic?})` | 按分类路径浏览(稳定性/性能/媒体/功耗/一多…),支持多级下钻(如 `媒体 / 音频和视频`);省略参数返回所有大类及文档数 |
+
+**检索算法**:BM25 排序(TF 饱和 + 文档长度归一化 + IDF)→ CJK 单字×0.3 / 双字 bigram×0.5 降权(抑制跨词边界噪声)→ 域内同义词软 OR 扩展(`data/synonyms.json` 驱动,如 弹窗↔弹出框↔对话框↔dialog)。同义词词典数据驱动,编辑 JSON 即可扩展,无需改代码。
 
 数据规模:452 篇文档,29 个大类(稳定性 76、性能 64、媒体 49、功耗 47、一多 47…);215 篇关联了示例代码,191 个唯一仓库(186 已克隆 + 5 核心仓跳过)。
 
@@ -225,6 +227,7 @@ tar -czf release/harmonyos-best-practices-code.tar.gz best_practices_code
 ## 设计说明
 
 - **为什么 MCP 而非纯 Skill**:452 篇文档 + 186 仓库(9.5MB+8GB)远超可静态塞入 Skill 的阈值。Skill 强在固定流程,MCP 强在按需检索——这里体量决定了检索是骨干。
+- **检索为何用 BM25 + CJK 降权 + 同义词**:纯字面 TF 会让"播放/视频"这类高频词刷分淹没"avplayer"等稀有区分词。BM25 的 TF 饱和与长度归一化压住高频词地板分,CJK 单字/双字降权去掉跨词边界噪声(如"运动模糊"误配"启动模式"),同义词软 OR 补上字面无法跨越的同义鸿沟(弹窗↔弹出框)。无外部依赖、纯本地、随包即用。
 - **文档随包、代码不随包**:9MB 文档压缩后 2.3MB,适合随 npm 包;8GB 代码不行,故做成独立 Release 包,按需下载。瘦身后 97MB,AI 读源码完全够用。
 - **代码瘦身取舍**:删除 `.git`/媒体/依赖/测试数据后,部分示例工程**不可直接编译**(需补依赖),但作为"AI 阅读参考代码"用途无损。18724 个 `.ets` 源码文件完整保留。
 
